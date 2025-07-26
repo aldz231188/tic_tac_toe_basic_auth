@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Крестики‑Нолики – минимальный фронт для теста бэка</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+    }
+
+    .container {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    #auth-area {
+      flex: 0 0 220px;
+      padding: 20px;
+      border-right: 1px solid #ccc;
+      background: #fafafa;
+    }
+
+    #game-area {
+      flex: 1;
+      padding: 20px;
+    }
+
+    table {
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    td {
+      width: 60px;
+      height: 60px;
+      text-align: center;
+      vertical-align: middle;
+      border: 1px solid #333;
+      font-size: 32px;
+      cursor: pointer;
+    }
+
+    input,
+    button {
+      margin: 4px 4px 4px 0;
+      padding: 4px 8px;
+    }
+
+    #status,
+    #message {
+      display: block;
+      min-height: 1.2em;
+      margin-top: 8px;
+      font-weight: bold;
+    }
+
+    #status {
+      color: green;
+    }
+
+    #message {
+      color: darkblue;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+
+    <div id="auth-area">
+      <h3>Авторизация</h3>
+      <input type="text" id="login" placeholder="Логин" style="width:100%" />
+      <input type="password" id="password" placeholder="Пароль" style="width:100%" />
+      <button onclick="signUp()">Sign‑Up</button>
+      <button onclick="signIn()">Sign‑In</button>
+      <div id="auth-message" style="color: darkred; margin-top: 10px;"></div>
+    </div>
+
+
+    <div id="game-area">
+      <h2>Крестики‑Нолики</h2>
+
+
+      <div id="players-info" style="margin:10px 0; font-weight:bold;">
+        Игрок X: <span id="playerX">—</span> &nbsp;|&nbsp;
+        Игрок O: <span id="playerO">—</span>
+      </div>
+      <label style="display:block; margin-top:10px;">
+        Мой символ:
+        <input id="player-symbol" type="text" maxlength="1" value="X" style="width:40px; text-align:center;" />
+      </label>
+
+
+      <div>
+        <button onclick="newGame('human')">Новая игра с игроком</button>
+        <button onclick="newGame('ai')">Игра с компьютером</button>
+        <button onclick="refreshBoard()">Обновить поле</button>
+      </div>
+
+
+      <table id="board"></table>
+
+
+      <div id="status"></div>
+      <div id="message"></div>
+
+      <!-- Блок статистики по ID игрока -->
+      <div style="margin-top:18px;">
+        <input type="text" id="stats-player-id" placeholder="ID игрока для статистики" />
+        <button onclick="fetchStats()">Показать статистику</button>
+      </div>
+      <div id="stats-output" style="margin-top:8px; font-weight:bold;"></div>
+
+
+      <div style="margin-top: 12px;">
+        <input type="text" id="join-game-id" placeholder="ID игры" />
+        <button onclick="joinGame()">Join</button>
+      </div>
+
+      <button style="margin-top:12px;" onclick="fetchGames()">Список игр</button>
+      <ul id="games-list" style="margin-top: 8px;"></ul>
+    </div>
+  </div>
+
+
+  <script>
+    let gameId = null;
+    let board = [["", "", ""], ["", "", ""], ["", "", ""]];
+    let authHeader = "";
+
+
+    const $ = id => document.getElementById(id);
+    const showStatus = txt => $("status").textContent = txt ?? "";
+    const showInfo = txt => $("message").textContent = txt ?? "";
+    const updatePlayersInfo = (px, po) => { $("playerX").textContent = px || "—"; $("playerO").textContent = po || "—"; };
+    function getPlayerSymbol() {
+      const val = document.getElementById("player-symbol").value.trim();
+      return val.length ? val[0] : "X";
+    }
+
+    function renderBoard() {
+      const table = document.getElementById("board");
+      table.innerHTML = "";
+      board.forEach((row, i) => {
+        const tr = document.createElement("tr");
+        row.forEach((cell, j) => {
+          const td = document.createElement("td");
+          td.textContent = cell;
+          td.onclick = () => makeMove(i, j);
+          tr.appendChild(td);
+        });
+        table.appendChild(tr);
+      });
+    }
+    renderBoard();
+
+
+    async function signUp() {
+      const login = $("login").value; const password = $("password").value;
+      const r = await fetch("/signup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ login, password }) });
+      $("auth-message").textContent = r.ok ? "OK" : await r.text();
+    }
+    async function signIn() {
+      const login = $("login").value; const password = $("password").value;
+      authHeader = "Basic " + btoa(`${login}:${password}`);
+      const r = await fetch("/signin", { method: "POST", headers: { "Authorization": authHeader } });
+      $("auth-message").textContent = r.ok ? "OK" : await r.text();
+    }
+
+
+    async function newGame(mode = "human") {
+      const r = await fetch("/new-game", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": authHeader }, body: JSON.stringify({ mode }) });
+      if (!r.ok) { showInfo(await r.text()); return; }
+      const d = await r.json();
+      gameId = d.id; board = [["", "", ""], ["", "", ""], ["", "", ""]];
+      renderBoard(); updatePlayersInfo(d.playerX, d.playerO);
+      showStatus(d.message || `Game ${gameId}`);
+    }
+
+    async function makeMove(i, j) {
+      const symbol = getPlayerSymbol();
+      board[i][j] = symbol;
+      renderBoard();
+      const r = await fetch(`/game/${gameId}`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": authHeader }, body: JSON.stringify({ board }) });
+      if (!r.ok) { showInfo(await r.text()); return; }
+      const d = await r.json(); board = d.board; renderBoard(); updatePlayersInfo(d.playerX, d.playerO); showStatus(d.message);
+    }
+
+    async function refreshBoard() {
+      const r = await fetch(`/game/${gameId}`, { headers: { Authorization: authHeader } });
+      if (!r.ok) { showInfo(await r.text()); return; }
+      const d = await r.json(); board = d.board; renderBoard(); updatePlayersInfo(d.playerX, d.playerO); showStatus(d.message); showInfo("Refreshed");
+    }
+
+    async function fetchStats() {
+      const pid = document.getElementById("stats-player-id").value.trim();
+
+      const res = await fetch(`/stats/${pid}`, {
+        method: "GET",
+        headers: { Authorization: authHeader }
+      });
+
+      if (!res.ok) {
+        showInfo(await res.text());
+        return;
+      }
+
+      const s = await res.json();
+      const winrate = (s.winrate ?? 0).toFixed(1);
+      document.getElementById("stats-output").textContent =
+        `Игры: ${s.totalGames}  |  Победы: ${s.wins}  |  Поражения: ${s.losses}  |  Ничьи: ${s.draws}  |  WinRate: ${winrate}%`;
+      showInfo("Статистика загружена");
+    }
+
+
+    async function fetchGames() { const r = await fetch("/games", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": authHeader } }); const ul = $("games-list"); ul.innerHTML = ""; if (!r.ok) { ul.textContent = await r.text(); return; } (await r.json()).forEach(id => { const li = document.createElement("li"); li.textContent = id; ul.appendChild(li); }); }
+
+    async function joinGame() { const id = $("join-game-id").value.trim(); const r = await fetch(`/game/${id}`, { headers: { Authorization: authHeader } }); if (!r.ok) { showInfo(await r.text()); return; } const d = await r.json(); gameId = id; board = d.board; renderBoard(); updatePlayersInfo(d.playerX, d.playerO); showStatus(d.message); showInfo("Joined"); }
+  </script>
+</body>
+
+</html>

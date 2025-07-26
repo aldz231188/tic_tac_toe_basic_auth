@@ -1,0 +1,56 @@
+digraph {
+	rankdir=RL;
+	graph [compound=true];
+	subgraph cluster_0 {
+		label = "go.uber.org/fx";
+		constructor_0 [shape=plaintext label="New.func1"];
+		"fx.Lifecycle" [label=<fx.Lifecycle>];
+	}
+	subgraph cluster_1 {
+		label = "go.uber.org/fx";
+		constructor_1 [shape=plaintext label="(*App).shutdowner-fm"];
+		"fx.Shutdowner" [label=<fx.Shutdowner>];
+	}
+	subgraph cluster_2 {
+		label = "go.uber.org/fx";
+		constructor_2 [shape=plaintext label="(*App).dotGraph-fm"];
+		"fx.DotGraph" [label=<fx.DotGraph>];
+	}
+	subgraph cluster_3 {
+		label = "t03/internal/infra/memory";
+		constructor_3 [shape=plaintext label="NewPGConfig"];
+		"memory.Config" [label=<memory.Config>];
+	}
+	subgraph cluster_4 {
+		label = "t03/internal/infra/memory";
+		constructor_4 [shape=plaintext label="NewStorage"];
+		"*memory.Storage" [label=<*memory.Storage>];
+	}
+	constructor_4 -> "fx.Lifecycle" [ltail=cluster_4];
+	constructor_4 -> "memory.Config" [ltail=cluster_4];
+	subgraph cluster_5 {
+		label = "t03/internal/infra/memory";
+		constructor_5 [shape=plaintext label="NewGameRepository"];
+		"domain.GameRepository" [label=<domain.GameRepository>];
+	}
+	constructor_5 -> "*memory.Storage" [ltail=cluster_5];
+	subgraph cluster_6 {
+		label = "t03/internal/app";
+		constructor_6 [shape=plaintext label="NewGameService"];
+		"domain.GameService" [label=<domain.GameService>];
+	}
+	constructor_6 -> "domain.GameRepository" [ltail=cluster_6];
+	subgraph cluster_7 {
+		label = "t03/internal/app";
+		constructor_7 [shape=plaintext label="NewUserService"];
+		"domain.UserService" [label=<domain.UserService>];
+	}
+	constructor_7 -> "domain.GameRepository" [ltail=cluster_7];
+	subgraph cluster_8 {
+		label = "t03/internal/api/http";
+		constructor_8 [shape=plaintext label="NewGameHandler"];
+		"*http.GameHandler" [label=<*http.GameHandler>];
+	}
+	constructor_8 -> "domain.GameService" [ltail=cluster_8];
+	constructor_8 -> "domain.UserService" [ltail=cluster_8];
+}
